@@ -313,15 +313,12 @@ class DoctorAppointmentAgent:
             self.graph.add_node("supervisor", self.supervisor_node)
             self.graph.add_node("information_node", self.information_node)
             self.graph.add_node("booking_node", self.booking_node)
-
-            # Define edges based on supervisor's decision (handled by Command return)
-            # Set the entry point
             self.graph.set_entry_point("supervisor")
 
-            # Define conditional edges from supervisor based on 'next' state value
+            
             self.graph.add_conditional_edges(
                 "supervisor",
-                lambda state: state['next'], # Route based on the 'next' value set by supervisor
+                lambda state: state['next'], 
                 {
                     "information_node": "information_node",
                     "booking_node": "booking_node",
@@ -329,29 +326,21 @@ class DoctorAppointmentAgent:
                     }
             )
 
-            # Edges *from* worker nodes back to supervisor are handled by their return Command(goto="supervisor")
+            
             self.graph.add_edge("information_node", "supervisor")
             self.graph.add_edge("booking_node", "supervisor")
 
 
-            # Compile the graph
+            
             self.app = self.graph.compile()
             logging.info("Graph compiled successfully and app is ready.")
             return self.app
 
         except Exception as e:
-            # Log the full traceback for better debugging
+            
             logging.exception("Exception occurred while building or compiling the graph:")
-            # Re-raise the exception if needed, or handle appropriately
+            
             raise e
-
-# Example usage (optional, for testing)
-# if __name__ == "__main__":
-#     agent = DoctorAppointmentAgent()
-#     workflow_app = agent.workflow()
-#     # You might add some test invocation here
-#     # print(workflow_app.get_graph().print_ascii())
-
 
 
 
