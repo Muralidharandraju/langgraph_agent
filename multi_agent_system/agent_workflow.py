@@ -6,16 +6,21 @@ from langchain_core.prompts.chat import ChatPromptTemplate
 from langgraph.graph import START, StateGraph, END
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage, AIMessage
-from prompt_library.prompt import systemprompt
+from prompt_library.prompt import system_prompt
 from utils.llm import LLMModel
 from agent_tools.tools import check_availability_by_doctor, check_availability_by_specialization, \
     set_appointment, cancel_appointment, reschedule_appointment
 from models.model import Router, AgentState
 import logging
+import json
 
+#reading json for user specific variables
+with open("./config.json", 'r') as f:
+    config = json.load(f)
 
+log_file_save_path = config['log_file_save_path']
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(filename=log_file_save_path+'log_information.txt',level=logging.INFO)
 logging.warning("AGENT WORKFLOW LOGGING INITIALIZED ") 
 logger = logging.getLogger(__name__)
 
@@ -26,99 +31,94 @@ class DoctorAppointmentAgent:
         self.llm_model= llm_model.get_llm()
         
     
-    def supervisor_node(self, state:AgentState) -> Command[Literal['information_node','booking_node',END]]:
-        logger.info(f"Supervisor node state: {state}") # Use f-string for better logging
-
+    def supervisor_node(self, state: AgentState) -> Command[Literal['information_node', 'booking_node', '__end__']]:
         
-        formatted_messages = [{"role": "system", "content": systemprompt}]
-        formatted_messages.append({"role": "user", "content": f"User ID: {state['id_number']}"})
-        formatted_messages.extend(state['messages'])
-
-        query =''
-        if state['messages'] and isinstance(state['messages'][0], HumanMessage):
+        logger.info(f"Entering supervisor node. Current state: {state}")
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"user's identification number is {state['id_number']}"},
+        ] + state["messages"]
+        
+        
+        query = ''
+        if len(state['messages']) == 1:
             query = state['messages'][0].content
-        elif state.get('query'): 
-                query = state['query']
-
-        logging.info(f"Query for supervisor: {query}") 
-
-        #llm invoke
-        response = self.llm_model.with_structured_output(Router).invoke(formatted_messages)
-
-        go_to = response['next']
-        reasoning = response['reasoning']
-
-        logging.info(f"Supervisor decision: route to {go_to}") 
-        logging.info(f"Supervisor reasoning: {reasoning}") 
-
-        update_dict = {
-            'next': go_to,
-            'current_reasoning': reasoning,
-            'messages': [AIMessage(content=reasoning)]
-        }
-        # Only adding the original query message if it's the very first turn
-        if len(state['messages']) == 1 and isinstance(state['messages'][0], HumanMessage):
-                update_dict['messages'].insert(0, state['messages'][0])
-                update_dict['query'] = query 
-
-
-        if go_to == "FINISH":
-            return Command(goto=END) 
-
-        actual_goto = END if go_to == "FINISH" else go_to
-
-        return Command(goto=actual_goto, update=update_dict)
+        
+        
+        response = self.llm_model.with_structured_output(Router).invoke(messages)
+        
+        goto = response["next"]
+        
+        logging.info(f"information on next step: {goto}")
+        
+        logging.info(f"response from LLM: {response}")
+            
+        if goto == "FINISH":
+            goto = END
+            
+        
+        if query:
+            return Command(goto=goto, update={'next': goto, 
+                                            'query': query, 
+                                            'current_reasoning': response["reasoning"],
+                                            'messages': [HumanMessage(content=f"user's identification number is {state['id_number']}")]
+                            })
+        return Command(goto=goto, update={'next': goto, 
+                                        'current_reasoning': response["reasoning"]}
+                    )
 
 
     def information_node(self, state:AgentState) -> Command[Literal['supervisor']]:
         logger.info(f"Information node state: {state}") # Use f-string
 
-        
-        info_system_prompt_content = (
-            "You are a specialized agent to provide information related to availability of doctors or any FAQs "
-            "related to the hospital based on the query. You have access to tools.\n"
-            "Make sure to ask the user politely if you need any further information to execute the tool.\n"
-        )
-
-        # Use the corrected variable name
-        info_system_prompt = ChatPromptTemplate.from_messages(
-                [
-                    (
-                        "system",
-                        info_system_prompt_content # Use the content string here
-                    ),
-                    (
-                        "placeholder",
-                        "{messages}"
-                    ),
-                ]
+        try:
+            info_system_prompt_content = (
+                "You are a specialized agent to provide information related to availability of doctors or any FAQs "
+                "related to the hospital based on the query. You have access to tools.\n"
+                "Make sure to ask the user politely if you need any further information to execute the tool.\n"
+                "doctor are available if the "
             )
 
-        
-        information_agent = create_react_agent(
-            model=self.llm_model, 
-            tools=[check_availability_by_doctor, check_availability_by_specialization],
-            prompt=info_system_prompt 
-        )
+            # Use the corrected variable name
+            info_system_prompt = ChatPromptTemplate.from_messages(
+                    [
+                        (
+                            "system",
+                            info_system_prompt_content # Use the content string here
+                        ),
+                        (
+                            "placeholder",
+                            "{messages}"
+                        ),
+                    ]
+                )
+
+            
+            information_agent = create_react_agent(
+                model=self.llm_model, 
+                tools=[check_availability_by_doctor, check_availability_by_specialization],
+                prompt=info_system_prompt 
+            )
 
 
-        agent_input = {"messages": state["messages"]}
-        result = information_agent.invoke(agent_input)
+            result = information_agent.invoke(state)
 
-        new_messages = result.get("messages", [])
-        last_message = new_messages[-1] if new_messages else AIMessage(content="No response from information agent.", name="information_node")
+            # new_messages = result.get("messages", [])
+            # last_message = new_messages[-1] if new_messages else AIMessage(content="No response from information agent.", name="information_node")
 
-        # Ensureing the message has the correct name attribute if needed in downstream
-        if not getattr(last_message, 'name', None):
-                last_message.name = "information_node"
+            # Ensureing the message has the correct name attribute if needed in downstream
+            # if not getattr(last_message, 'name', None):
+            #         last_message.name = "information_node"
 
-        return Command(
-            update={
-                "messages": [last_message]
-            },
-            goto="supervisor",
-        )
-
+            return Command(
+                update={
+                "messages": state["messages"] + [
+                    AIMessage(content=result["messages"][-1].content, name="information_node")
+                ]},goto="supervisor",
+            )
+        except Exception as e:
+             print(str(e))
 
     def booking_node(self, state:AgentState) -> Command[Literal['supervisor']]:
         logger.info(f"Booking node state: {state}")
@@ -204,8 +204,5 @@ class DoctorAppointmentAgent:
             logging.exception("Exception occurred while building or compiling the graph:")
             
             raise e
-
-
-
 
 

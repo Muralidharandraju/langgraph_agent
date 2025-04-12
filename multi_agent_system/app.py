@@ -4,7 +4,7 @@ from agent_workflow import DoctorAppointmentAgent
 import os
 from langchain_core.messages import HumanMessage
 
-os.environ.pop("SSL_CERT_FILE", None)
+# os.environ.pop("SSL_CERT_FILE", None)
 
 class UserQuery(BaseModel):
     query: str
@@ -19,8 +19,7 @@ async def chat(user_query: UserQuery):
     
     
     response = workflow.invoke({"messages": [HumanMessage(content=user_query.query)],
-                                "id_number":user_query.id_number},
-                                {"recursion_limit": 20})
+                                "id_number":user_query.id_number})
     
     return response
     
