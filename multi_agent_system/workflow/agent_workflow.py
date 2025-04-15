@@ -193,8 +193,6 @@ class DoctorAppointmentAgent:
             self.graph.add_edge("information_node", "supervisor")
             self.graph.add_edge("booking_node", "supervisor")
 
-
-            
             self.app = self.graph.compile()
             logging.info("Graph compiled successfully and app is ready.")
             return self.app
