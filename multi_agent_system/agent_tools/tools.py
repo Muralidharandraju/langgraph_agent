@@ -15,7 +15,7 @@ def check_availability_by_doctor(desired_date:DateModel, doctor_name:Literal['ke
     Checking the database if we have availability for the specific doctor.
     The parameters should be mentioned by the user in the query
     """
-    df = pd.read_csv(r"./data/doctor_availability.csv")
+    # df = pd.read_csv(r"./data/doctor_availability.csv")
     
     df['date_slot_time'] = df['date_slot'].apply(lambda input: input.split(' ')[-1])
     
@@ -34,7 +34,7 @@ def check_availability_by_specialization(desired_date:DateModel, specialization:
     Checking the database if we have availability for the specific specialization.
     The parameters should be mentioned by the user in the query
     """
-    df = pd.read_csv(r"./data/doctor_availability.csv")
+    # df = pd.read_csv(r"./data/doctor_availability.csv")
     
     df['date_slot_time'] = df['date_slot'].apply(lambda input: input.split(' ')[-1])
     rows = df[(df['date_slot'].apply(lambda input: input.split(' ')[0]) == desired_date.date) & (df['specialization'] == specialization) & (df['is_available'] == True)].groupby(['specialization', 'doctor_name'])['date_slot_time'].apply(list).reset_index(name='available_slots')
@@ -74,17 +74,16 @@ def set_appointment(desired_date:DateTimeModel, id_number:IdentificationNumberMo
         dt = datetime.strptime(dt_str, "%d-%m-%Y %H:%M")
         
         # Format the output as 'DD-MM-YYYY H.M' (removing leading zero from hour only)
-        return dt.strftime("%d-%m-%Y %#H.%M")
+        return dt.strftime("%d-%m-%Y %H:%M")
     
-    df = pd.read_csv(r"./data/doctor_availability.csv")
+    # df = pd.read_csv(r"./data/doctor_availability.csv")
     
     case = df[(df['date_slot'] == convert_datetime_format(desired_date.date))&(df['doctor_name'] == doctor_name)&(df['is_available'] == True)]
     if len(case) == 0:
         return "No available appointments for that particular case"
     else:
         df.loc[(df['date_slot'] == convert_datetime_format(desired_date.date))&(df['doctor_name'] == doctor_name) & (df['is_available'] == True), ['is_available','patient_to_attend']] = [False, id_number.id]
-        df.to_csv(f'availability.csv', index = False)
-
+        df.to_csv(f'./data/doctor_availability.csv', index = False)
         return "Successfully done"
 @tool
 def cancel_appointment(date:DateTimeModel, id_number:IdentificationNumberModel, doctor_name:Literal['kevin anderson','robert martinez','susan davis','daniel miller','sarah wilson','michael green','lisa brown','jane smith','emily johnson','john doe']):
@@ -92,7 +91,7 @@ def cancel_appointment(date:DateTimeModel, id_number:IdentificationNumberModel, 
     Canceling an appointment.
     The parameters MUST be mentioned by the user in the query.
     """
-    df = pd.read_csv(r"./data/doctor_availability.csv")
+    # df = pd.read_csv(r"./data/doctor_availability.csv")
     case_to_remove = df[(df['date_slot'] == date.date)&(df['patient_to_attend'] == id_number.id)&(df['doctor_name'] == doctor_name)]
     if len(case_to_remove) == 0:
         return "You don´t have any appointment with that specifications"
@@ -107,7 +106,7 @@ def reschedule_appointment(old_date:DateTimeModel, new_date:DateTimeModel, id_nu
     Rescheduling an appointment.
     The parameters MUST be mentioned by the user in the query.
     """
-    df = pd.read_csv(r"./data/doctor_availability.csv")
+    # df = pd.read_csv(r"./data/doctor_availability.csv")
     available_for_desired_date = df[(df['date_slot'] == new_date.date)&(df['is_available'] == True)&(df['doctor_name'] == doctor_name)]
     if len(available_for_desired_date) == 0:
         return "Not available slots in the desired period"

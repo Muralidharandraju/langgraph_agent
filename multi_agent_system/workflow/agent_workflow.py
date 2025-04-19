@@ -20,7 +20,8 @@ with open("./config.json", 'r') as f:
 
 log_file_save_path = config['log_file_save_path']
 
-logging.basicConfig(filename=log_file_save_path+'log_information.txt',level=logging.INFO)
+log_format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
+logging.basicConfig(filename=log_file_save_path+'log_information.txt',level=logging.INFO,format=log_format)
 logging.warning("AGENT WORKFLOW LOGGING INITIALIZED ") 
 logger = logging.getLogger(__name__)
 
