@@ -1,3 +1,4 @@
 {"model_name":"gpt-4o",
-"log_file_save_path": "./loginformation/"
+"log_file_save_path": "./loginformation/",
+"backend_url":"http://localhost:8000/chat"
 }
