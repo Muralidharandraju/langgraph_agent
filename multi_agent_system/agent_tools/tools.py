@@ -6,7 +6,7 @@ from models.model import DateModel, DateTimeModel, IdentificationNumberModel
 
 
 df = pd.read_csv(r"./data/doctor_availability.csv")
-
+df['doctor_name'].unique()
 
 
 @tool
